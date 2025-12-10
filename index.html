@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+ <meta charset="UTF-8">
+ <meta name="viewport" content="width=device-width, initial-scale=1.0">
+ <meta name="description" content="BASE用の画像を正方形・1280px・軽量JPGに自動変換するツール。ドラッグ&ドロップで簡単に画像を最適化できます。">
+ <title>Netshop Buddy - BASE画像整形ツール</title>
+ <style>
+  body {
+   font-family: sans-serif;
+   text-align: center;
+   padding: 20px;
+   background: #f4f4f4;
+  }
+
+  .container {
+   max-width: 800px;
+   margin: 0 auto;
+   background: white;
+   padding: 40px;
+   border-radius: 10px;
+   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  }
+
+  h1 {
+   color: #333;
+   margin-bottom: 10px;
+  }
+
+  p {
+   color: #666;
+   margin-bottom: 30px;
+  }
+
+  /* アップロードエリア */
+  .drop-zone {
+   border: 3px dashed #ccc;
+   border-radius: 10px;
+   padding: 50px;
+   cursor: pointer;
+   transition: 0.3s;
+   background: #fafafa;
+  }
+
+  .drop-zone:hover {
+   border-color: #f6b01c;
+   background: #fffdf5;
+  }
+
+  .drop-zone.dragover {
+   border-color: #f6b01c;
+   background: #ffe;
+  }
+
+  /* 結果エリア */
+  #result-area {
+   margin-top: 30px;
+   display: grid;
+   grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+   gap: 15px;
+  }
+
+  .img-card {
+   border: 1px solid #ddd;
+   padding: 5px;
+   border-radius: 5px;
+   background: white;
+  }
+
+  .img-card img {
+   width: 100%;
+   height: auto;
+   display: block;
+  }
+
+  .download-btn {
+   display: block;
+   width: 100%;
+   padding: 8px 0;
+   margin-top: 5px;
+   background: #333;
+   color: white;
+   text-decoration: none;
+   font-size: 12px;
+   border-radius: 3px;
+  }
+
+  .download-btn:hover {
+   background: #555;
+  }
+ </style>
+</head>
+
+<body>
+
+ <div class="container">
+  <h1>Netshop Buddy 画像整形ツール 📸</h1>
+  <p>画像をここにドラッグ＆ドロップしてください。<br>自動で<b>「正方形・1280px・軽量JPG」</b>に変換します。</p>
+
+  <div class="drop-zone" id="dropZone">
+   📂 ここをクリックして画像を選択<br>またはファイルをドロップ
+   <input type="file" id="fileInput" multiple accept="image/*" style="display:none;">
+  </div>
+
+  <div id="result-area"></div>
+ </div>
+
+ <script>
+  const TARGET_SIZE = 1280; // BASE推奨サイズ
+  const QUALITY = 0.85;     // 画質（0.1〜1.0）
+
+  const dropZone = document.getElementById('dropZone');
+  const fileInput = document.getElementById('fileInput');
+  const resultArea = document.getElementById('result-area');
+
+  // ドラッグ＆ドロップのイベント
+  dropZone.addEventListener('click', () => fileInput.click());
+  dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('dragover'); });
+  dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+  dropZone.addEventListener('drop', (e) => {
+   e.preventDefault();
+   dropZone.classList.remove('dragover');
+   handleFiles(e.dataTransfer.files);
+  });
+  fileInput.addEventListener('change', (e) => handleFiles(e.target.files));
+
+  function handleFiles(files) {
+   Array.from(files).forEach(file => {
+    if (!file.type.startsWith('image/')) return;
+    processImage(file);
+   });
+  }
+
+  function processImage(file) {
+   const reader = new FileReader();
+   reader.onload = (e) => {
+    const img = new Image();
+    img.onload = () => {
+     const canvas = document.createElement('canvas');
+     const ctx = canvas.getContext('2d');
+
+     // 1. 正方形にトリミングするための計算（中央切り抜き）
+     const minSide = Math.min(img.width, img.height);
+     const sx = (img.width - minSide) / 2;
+     const sy = (img.height - minSide) / 2;
+
+     // 2. キャンバスサイズをBASE推奨の1280pxに設定
+     canvas.width = TARGET_SIZE;
+     canvas.height = TARGET_SIZE;
+
+     // 3. 描画（リサイズ＆トリミング）
+     ctx.fillStyle = "#FFFFFF"; // 余白が出たとき用（基本出ない）
+     ctx.fillRect(0, 0, TARGET_SIZE, TARGET_SIZE);
+     ctx.drawImage(img, sx, sy, minSide, minSide, 0, 0, TARGET_SIZE, TARGET_SIZE);
+
+     // 4. 画像データの生成 (JPEG, 画質85%)
+     const dataUrl = canvas.toDataURL('image/jpeg', QUALITY);
+
+     // 5. 表示とダウンロードボタン作成
+     createResultCard(dataUrl, file.name);
+    };
+    img.src = e.target.result;
+   };
+   reader.readAsDataURL(file);
+  }
+
+  function createResultCard(dataUrl, originalName) {
+   const div = document.createElement('div');
+   div.className = 'img-card';
+
+   const img = document.createElement('img');
+   img.src = dataUrl;
+
+   const link = document.createElement('a');
+   link.href = dataUrl;
+   // ファイル名を "converted_元の名前.jpg" にする
+   const newName = originalName.replace(/\.[^/.]+$/, "") + "_base.jpg";
+   link.download = newName;
+   link.textContent = "⬇ ダウンロード";
+   link.className = "download-btn";
+
+   div.appendChild(img);
+   div.appendChild(link);
+   resultArea.appendChild(div);
+  }
+ </script>
+
+</body>
+
+</html>
